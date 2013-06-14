@@ -3,6 +3,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <sstream>
 #include <vector>
 
 #include <cmath>
@@ -10,6 +11,7 @@
 
 #include "GnuplotPipes.hpp"
 #include "time.h"
+#include "unistd.h"
 
 using namespace std;
 
@@ -20,6 +22,9 @@ pair<double,double> salesman;
 double mutationRate = 0.2;
 unsigned int popSize = 10, numCities = 9, sameFittestCounter = 0;
 set<double> fitnessHistory;
+//map<double,int> fitnesses;
+vector<double> fitnesses;
+vector<vector<double> > population; 
 
 double CalcDistance(const pair<double,double> &a, const pair<double,double> &b) {
     double diffX = b.first - a.first;
@@ -39,7 +44,7 @@ void FillCities(CityMap &cities) {
     cities.insert(make_pair(8, make_pair(28.826,22.07)));
 }
 
-int RandomCity(void) {
+int RndCity(void) {
     return( (double(rand())/RAND_MAX)* 9 );
 }
 
@@ -59,26 +64,32 @@ double EvaluateFitness(const vector<double> &chromosome) {
     return(fitness);
 }
 
-void GenerateInitialPopulation(vector<vector<double> > &population, 
-			       unsigned int &popSize, unsigned int &numCities) {
-    vector<double> fitnesses;
+bool CheckInFitnesses(const double &fitness) {
+    return(find(fitnesses.begin(), fitnesses.end(), fitness) != 
+           fitnesses.end());
+    //return(fitnessHistory.find(fitness) != fitnessHistory.end());
+}
+
+void GenerateInitialPopulation(void) {
+    double fitness;
     while (population.size() != popSize) {
 	vector<double> chromosome;
         while(chromosome.size() != numCities) {
-	    int rndCity = RandomCity();
+	    int rndCity = RndCity();
 	    if(find(chromosome.begin(), chromosome.end(), rndCity) == 
 	       chromosome.end())
 		chromosome.push_back(rndCity);
         }
 
-        double fitness = EvaluateFitness(chromosome);
-        bool inFitnesses = fitnessHistory.find(fitness) != fitnessHistory.end();
-        while(inFitnesses) {
+        fitness = EvaluateFitness(chromosome);
+
+        while(CheckInFitnesses(fitness)) {
             random_shuffle(chromosome.begin(), chromosome.end());
             fitness = EvaluateFitness(chromosome);
-            inFitnesses = fitnessHistory.find(fitness) != fitnessHistory.end();
         }        
+
         fitnessHistory.insert(fitness);
+        fitnesses.push_back(fitness);
         population.push_back(chromosome);
     }// while
 }
@@ -96,8 +107,7 @@ int Round(const double &val)
         return(ceil(val));
 }
 
-vector<double> PerformCrossover(vector<double> a, vector<double> b, 
-                                vector<double> &fitnesses) {
+vector<double> PerformCrossover(vector<double> a, vector<double> b) {
     int halfNumCities = Round(numCities*0.5);
     vector<double> offspring;
     for(int i = 0; i < halfNumCities-1; i++) {
@@ -114,21 +124,24 @@ vector<double> PerformCrossover(vector<double> a, vector<double> b,
     for(int i = 0; i < a.size(); i++)
         offspring.push_back(a[i]);
     
-    double offFitness = EvaluateFitness(offspring);
-    bool inFitnesses = fitnessHistory.find(offFitness) != fitnessHistory.end();
-    while(inFitnesses) {
+    double fitness = EvaluateFitness(offspring);
+
+    while(CheckInFitnesses(fitness)) {
         random_shuffle(offspring.begin(), offspring.end());
         //next_permutation(offspring.begin()+halfNumCities, offspring.end());
-        offFitness = EvaluateFitness(offspring);
-        inFitnesses = fitnessHistory.find(offFitness) != fitnessHistory.end();
-    }
-    fitnessHistory.insert(offFitness);
+        fitness = EvaluateFitness(offspring);
+    }        
+
+    fitnesses.push_back(fitness);
+    fitnessHistory.insert(fitness);
     return(offspring);
 }
 
 int main (int argc, char* argv[]) {
-    vector<vector<double> > population; 
+    Gnuplot g1;
+    g1.Cmd("set terminal gif animate delay 0.0001");
     vector<double> solution;
+    vector<string> plottingFiles;
     double solutionFitness;
     int maxIterations = atoi(argv[1]);
 
@@ -143,9 +156,9 @@ int main (int argc, char* argv[]) {
     salesman = make_pair(0,0);
     
     //Generate the initial population. 
-    GenerateInitialPopulation(population, popSize, numCities);
+    GenerateInitialPopulation();
 
-    int numIterations=0; 
+    int numIterations=0, numSolutions=0; 
     while(numIterations != maxIterations) {
 #ifdef VERBOSE
         cout << "Iteration number : " << numIterations << endl;
@@ -154,8 +167,7 @@ int main (int argc, char* argv[]) {
         double fatBastard0 = 0, fatBastard1 = 0, fatBastard2 = 0;
         unsigned int fittestPos = -1, secPos = -1, thirdPos = -1;
         unsigned int bastardPos0 = -1, bastardPos1 = -1, bastardPos2 = -1;
-        vector<double> fitnesses;
-        
+
         //Evaluate the fitness of each solution.
 #ifdef VERBOSE
         cout << "The Current Population Fitnesses: " << endl;
@@ -202,34 +214,67 @@ int main (int argc, char* argv[]) {
                 fatBastard2 = fitness;
                 bastardPos2 = i;
             }
-            fitnesses.push_back(fitness);
         }//for(unsigned int i = 0; i < population.size();
 
 #ifdef VERBOSE        
-            cout << endl << "Fittest : " << fittest << " " << fittestPos
-                 << "  |  1st Fittest : " << secFittest << " " 
-                 << secPos << "  |  2nd Fittest : " << thirdFittest << " " 
-                 << thirdPos << endl
-                 << "Fattest Bastard: " << fatBastard0 << " " 
-                 << bastardPos0 << "  | 1st Fattest: " << fatBastard1 << " " 
-                 << bastardPos1 << "   | 2nd Fattest: " << fatBastard2 
-                 << " " << bastardPos2 << endl;
+        cout << endl << "Fittest : " << fittest << " " << fittestPos
+             << "  |  1st Fittest : " << secFittest << " " 
+             << secPos << "  |  2nd Fittest : " << thirdFittest << " " 
+             << thirdPos << endl
+             << "Fattest Bastard: " << fatBastard0 << " " 
+             << bastardPos0 << "  | 1st Fattest: " << fatBastard1 << " " 
+             << bastardPos1 << "   | 2nd Fattest: " << fatBastard2 
+             << " " << bastardPos2 << endl;
 #endif        
 
+        cout << endl << "The solution is " << fittest <<". After " 
+             << numIterations << " iterations. " << endl;
+        if(solutionFitness > fittest) {
+            vector<double> temp = population.at(fittestPos);
+            stringstream ss;
+            ss << "/tmp/test" << numSolutions << ".dat";
+            ofstream soln;
+            plottingFiles.push_back(ss.str());
+            soln.open(ss.str().c_str());
+            for(unsigned int i = 0; i < temp.size(); i++) {
+                pair<double,double> pair0 = (*cities.find(temp[i])).second;
+                if(i == 0) {
+                    pair<double,double> pair1 = (*cities.find(solution[i+1])).second;
+                    soln << "Salesman " << salesman.first << " " << salesman.second << " " 
+                         << pair0.first-salesman.first << " " 
+                         << pair0.second-salesman.second << endl
+                         << i << " " << pair0.first << " " << pair0.second << " " 
+                         << pair1.first-pair0.first << " " << pair1.second-pair0.second 
+                         << endl;
+                }else if(i == solution.size()-1) {
+                    soln << i << " " << pair0.first << " " << pair0.second << " " 
+                         << salesman.first-pair0.first << " " 
+                         << salesman.second-pair0.second << endl;
+                }else {
+                    pair<double,double> pair1 = (*cities.find(temp[i+1])).second;
+                    soln << i << " " << pair0.first << " " << pair0.second << " " 
+                         << pair1.first-pair0.first << " " << pair1.second-pair0.second 
+                         << endl;
+                }
+            }
+            soln.close();
+            numSolutions++;
+        }
+        
         solution = population.at(fittestPos);
         solutionFitness = fittest;
-        if((secFittest - fittest) < 0.0001 || fittest <= 37.071)
-            break;
         
+        if(fittest <= 37.071)
+            break;
+
         //The Mating Ritual
         vector<double> parentA = population.at(fittestPos);
         vector<double> parentB = population.at(secPos);
         vector<double> parentC = population.at(thirdPos);
 
-        vector<double> offspring0 = PerformCrossover(parentA, parentB, fitnesses);
-        vector<double> offspring1 = PerformCrossover(parentA, parentC, fitnesses);
-        vector<double> offspring2 = PerformCrossover(parentB, parentC, fitnesses);
-        
+        vector<double> offspring0 = PerformCrossover(parentA, parentB);
+        vector<double> offspring1 = PerformCrossover(parentA, parentC);
+        vector<double> offspring2 = PerformCrossover(parentB, parentC);
         
 #ifdef VERBOSE
         // cout << "dfiajlofjweiojfeoj   ";
@@ -238,65 +283,80 @@ int main (int argc, char* argv[]) {
         cout << endl << "---------------------------------------" << endl;
 #endif
     
-        // if(solutionFitness == fittest)
-        //     sameFittestCounter++;
-        
-        // if(sameFittestCounter == 10) {
-        //     random_shuffle(population[fittestPos].begin(),
-        //                    population[fittestPos].end());
-        //     sameFittestCounter = 0;
-        // }
+        //The mutations
+        bool hasMutation = double(rand())/ RAND_MAX < mutationRate;
+
+        if(hasMutation) {
+            double fitness0 = EvaluateFitness(offspring0);
+            while(CheckInFitnesses(fitness0)) {
+                int city0 = RndCity();
+                int city1 = RndCity();
+                while(city0 == city1)
+                    city0=RndCity();
+                 
+                vector<double>::iterator it0 = 
+                    find(offspring0.begin(),offspring0.end(),RndCity());
+                vector<double>::iterator it1 = 
+                    find(offspring0.begin(),offspring0.end(),RndCity());
+
+                swap(offspring0.at(city0),offspring0.at(city1));
+                fitness0 = EvaluateFitness(offspring0);
+            }
+        }
 
         //And add the new guys
-        population[bastardPos0] = offspring0;
-        population[bastardPos1] = offspring1;
-        population[bastardPos2] = offspring2;
+        population.at(bastardPos0) = offspring0;
+        population.at(bastardPos1) = offspring1;
+        population.at(bastardPos2) = offspring2;
         
-        //The mutations
-         // bool hasMutation = double(rand())/ RAND_MAX < mutationRate;
-         // bool inFitness = true;
-         // if(hasMutation) {
-         //     while(inFitness) {
-         //         random_shuffle(population[bastardPos0].begin(), 
-         //                        population[bastardPos0].end());
-         //         inFitness = find(population[bastardPos0].begin(),
-         //                          population[bastardPos0].end(),
-         //                          EvaluateFitness(population[bastardPos0])) !=
-         //             population[bastardPos0].end();
-         //     }
-         // }
         numIterations++;
     }//while 
 
-    cout << endl << "The solution is " << solutionFitness <<". After " 
-         << numIterations << " iterations. " << endl;
-    ofstream soln;
-    soln.open("test.dat");
-    for(unsigned int i = 0; i < solution.size(); i++) {
-        pair<double,double> pair0 = (*cities.find(solution[i])).second;
-        if(i == 0) {
-            pair<double,double> pair1 = (*cities.find(solution[i+1])).second;
-            soln << "Salesman " << salesman.first << " " << salesman.second << " " 
-                 << pair0.first-salesman.first << " " 
-                 << pair0.second-salesman.second << endl
-                 << i << " " << pair0.first << " " << pair0.second << " " 
-                 << pair1.first-pair0.first << " " << pair1.second-pair0.second 
-                 << endl;
-        }else if(i == solution.size()-1) {
-            soln << i << " " << pair0.first << " " << pair0.second << " " 
-                 << salesman.first-pair0.first << " " 
-                 << salesman.second-pair0.second << endl;
-        }else {
-            pair<double,double> pair1 = (*cities.find(solution[i+1])).second;
-            soln << i << " " << pair0.first << " " << pair0.second << " " 
-                 << pair1.first-pair0.first << " " << pair1.second-pair0.second 
-                 << endl;
-        }
-    }
-    soln.close();
+    // cout << endl << "The solution is " << solutionFitness <<". After " 
+    //      << numIterations << " iterations. " << endl;
+    // ofstream soln;
+    // soln.open("test.dat");
+    // for(unsigned int i = 0; i < solution.size(); i++) {
+    //     pair<double,double> pair0 = (*cities.find(solution[i])).second;
+    //     if(i == 0) {
+    //         pair<double,double> pair1 = (*cities.find(solution[i+1])).second;
+    //         soln << "Salesman " << salesman.first << " " << salesman.second << " " 
+    //              << pair0.first-salesman.first << " " 
+    //              << pair0.second-salesman.second << endl
+    //              << i << " " << pair0.first << " " << pair0.second << " " 
+    //              << pair1.first-pair0.first << " " << pair1.second-pair0.second 
+    //              << endl;
+    //     }else if(i == solution.size()-1) {
+    //         soln << i << " " << pair0.first << " " << pair0.second << " " 
+    //              << salesman.first-pair0.first << " " 
+    //              << salesman.second-pair0.second << endl;
+    //     }else {
+    //         pair<double,double> pair1 = (*cities.find(solution[i+1])).second;
+    //         soln << i << " " << pair0.first << " " << pair0.second << " " 
+    //              << pair1.first-pair0.first << " " << pair1.second-pair0.second 
+    //              << endl;
+    //     }
+    // }
+    // soln.close();
 
-    Gnuplot g1;
+
     g1.UnSetKey().SetRange("x",0,40);
-    g1.Cmd("plot 'test.dat' u 2:3:4:5 w vector, 'test.dat' u 2:3 w points pt 4");
-    g1.WaitForKey();
+    g1.Cmd("set output \"animated.gif\"");
+    
+    stringstream makeGif;
+    for(int i = 0; i < numSolutions; i++) {
+        stringstream temp;
+        temp << "/tmp/test" << i << ".dat";
+
+        makeGif << "set title \"Solution Number " << i << "\";plot \"" 
+                << temp.str() << "\" u 2:3:4:5 w vector, \"" 
+                << temp.str() << "\" u 2:3 w points pt 4;";
+    }
+    g1.Cmd(makeGif.str());
+    //g1.Cmd("plot 'test.dat' u 2:3:4:5 w vector, 'test.dat' u 2:3 w points pt 4");
+    sleep(1.5);
+    // g1.WaitForKey();
+    g1.RemoveTempFiles();
+
+    for(unsigned int i = 0; i < plottingFiles.size(); i++)
 }
