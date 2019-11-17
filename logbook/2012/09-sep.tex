@@ -1,0 +1,105 @@
+\chapter{September}
+\section{05-06 September 2012}
+Notes taken from \url{obitko.com/tutorials/genetic-algorithms/index.php}
+\subsection{Basic Outline}
+\begin{enumerate}
+\item Generate a random population (suitable to your problem)
+\item Evaluate the fitness of the chromosomes in the population
+\item Select two parents according to their fitness
+\item Crossover(mate) them to generate offspring
+\item Potentially mutate the child. 
+\item Put the children into the population
+\item Evaluate the fitness of the children
+\item See if we have improved things
+\item Rinse, repeat
+\end{enumerate}
+
+\subsection{Types of Selection}
+\subsubection{Roulette Wheel}
+Parents are selected according to the fitness. Those that are more fit have a 
+better chance to get selected. This method can have problem when the fitness 
+varies greatly within the population.
+
+\subsubsection{Rank Selection}
+First rank the population, and then every chromosome receives a fitness from 
+the rank. The worst will have fitness 1 and the best a fitness of N, where
+N is equal to the number of chromosomes in the population.
+
+\subsubsection{Steady State Selection}
+Pick some with a good fitness to reproduce, and replace the ones with the lowest 
+fitness by these offspring. The remaining chromosomes survive to the next iteration.
+
+\subsubsection{Elitism}
+First copy over some of the best to the new population. Then proceed to use one 
+of the aforementioned methods.
+
+\subsection{Binary Encoding}
+\label{subsec:binary}
+Gives many possible chromosomes to choose from. However, this is sometimes not 
+a natural way to encode the problem. See, Example \ref{subsubsec:knapsack}. 
+\subsubsection{Crossover}
+\begin{enumerate}
+\item Simple point $\rightarrow$ Copy part from A, rest of B.
+\item Two Point  $\rightarrow$ Copy part from A, part from B, rest from A.
+\item Uniform  $\rightarrow$ Randomly copy bits
+\item Arithmetic  $\rightarrow$ Perform some arithmetic operation.
+\end{enumerate}
+\subsubsection{Mutation}
+Random select bits to be flipped
+
+\subsection{Permutation Encoding}
+This is good for ordering problems. A string of numbers/letters represents the 
+data. One must take care during crossover and mutation to ensure you are left 
+with a real possible solution. See, Example \ref{subsubsec:salesman}.
+\subsubsection{Crossover - Single Point}
+Copy to the point from A, scan B and add those that do not already appear. 
+\subsubsection{Mutation}
+Randomly choose two numbers and exchange.
+
+\subsection{Value Encoding Encoding}
+Every chromosome is a string of values, useful where binary encoding would be 
+difficult. Good for some special problems but methods of crossover and mutation 
+are highly specific to the problem. See, Example \ref{subsubsec:neural}.
+\subsubsection{Crossover}
+All crossovers from Binary Encoding(Sec. \ref{subsec:binary} are useable.
+\subsubsection{Mutation}
+For real numbers add or subtract a small number. 
+
+\subsection{Tree Encoding Encoding}
+Every chromosome is a tree of objects such as functions or commands in a 
+programming language. This is good for evolving programs. LISP uses it quite 
+a bit. See, Example \ref{subsubsec:func}.
+\subsubsection{Crossover}
+One point is selected and parents are joined at that point. 
+\subsubsection{Mutation}
+Change the operator, number, selected nodes, etc. 
+\subsection{Example Problems}
+\subsubsection{Knapsack Problem}
+\label{subsubsec:knapsack}
+Things have been given a size, backpack has set size, put all things possible 
+into backpack. Each bit says if the thing is in the pack. This example is best 
+encoded with a binary representation.
+
+\subsubsection{Traveling Salesman Problem}
+\label{subsubsec:salesman}
+
+\subsubsection{Neural Networks}
+\label{subsubsec:neural}
+
+\subsection{Recommended Values}
+\begin{description}
+\item[Crossover Rate] 80-90\% some show 60\%
+\item[Mutation Rate] Low - 0.5 - 1.0\%
+\item[Population] 20-30, sometimes larger. This really depends on the encoding 
+  and the number of alles. For example, if the chromosomes have 32 bits, then 
+  choose a population with about 32 chromosomes. 32 chromosomes would be way too 
+  many for a 16-bit chromosome.
+\item[Selection] Depends on the problem
+\item[Encoding] Depends on the problem
+\item[Croccover/Mutation] Depends on the problem.
+\end{description}
+
+\section{07 September 2012}
+We are definitely goign to want to use the tree encoding for the function finding. 
+It makes me wonder if this has been done before. Michael confirms that this is the 
+case, but we will be using a new fitness test. 
